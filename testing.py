@@ -3,6 +3,7 @@ import os
 import tensorflow as tf
 import pathlib
 import base64
+import json
 
 from tensorflow import keras
 from tensorflow.keras.models import Sequential
@@ -28,6 +29,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_response_only(code)
         self.send_header('Server','python3 http.server Development Server')     
         self.send_header('Date', self.date_time_string())
+        self.send_header('plant', message)
         self.end_headers()  
 
     def do_POST(self):
@@ -36,8 +38,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             
             content_length = int(self.headers['Content-Length']) # <--- Gets the size of data
             print(content_length)
-            post_data = str(self.rfile.read(content_length).decode('utf-8')).split("\r\n")
-            image = Image.open(BytesIO(base64.b64decode(post_data[3]))).resize((img_width,img_height))
+            post_data = str(self.rfile.read(content_length).decode('utf-8'))
+           
+            image = Image.open(BytesIO(base64.b64decode(json.loads(post_data)["image"]))).resize((img_width,img_height))
 
             predictions = model.predict(tf.expand_dims(keras.preprocessing.image.img_to_array(image), 0))
             score = tf.nn.softmax(predictions[0])
@@ -46,6 +49,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 "This image most likely belongs to {} with a {:.2f} percent confidence."
                 .format(class_names[np.argmax(score)], 100 * np.max(score))
             )
+
+            self.send_response(200, message=class_names[np.argmax(score)])
       
  
 def run(server_class=HTTPServer, handler_class=BaseHTTPRequestHandler):
